@@ -1,0 +1,77 @@
+---
+title: "Week3: Image Analysis Using Fiji"
+author: "Kaitlyn Li"
+date: "9/22/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(dplyr)
+library(knitr)
+library(readr)
+library(moderndive)
+library(infer)
+```
+
+
+
+```{r, include = FALSE}
+options(httr_oob_default = TRUE)
+library(tidyverse)
+library(googlesheets4)
+url <- "https://docs.google.com/spreadsheets/d/1kxY0uaV1wS1OGlqn60fGKX9fVdjwCezsi7WakJBdyUw/edit?usp=sharing"
+pt_1 <- read_sheet(ss = url,
+                     sheet = "Part 1")
+pt_2 <- read_sheet(ss = url,
+                     sheet = "Part 2")
+tidy_pt_2 <- read_sheet(ss = url,
+                     sheet = "Pt2tidy")
+```
+
+
+
+```{r, echo=FALSE, fig.cap = "Figure 1. A scatter plot depicting the observation of contracted cells in two conditions (A and B) grouped by observer. In this plot, the error bars are calculated by the function `stat_summary` and shown by condition, considering the three observers and 3 images as replicates of the same experiment."}
+ggplot(data = pt_1, aes(x = Condition, y = Proportion, color = Observer))+ 
+  geom_jitter(width = 0.45) +
+  labs(x = "Condition", y = "Fraction Contracted", title = "Observation of Contracted Cells in 2 Conditions") +
+  stat_summary(fun.data=mean_sdl, fun.args = list(mult=1), 
+        geom="errorbar", color="red", width=0.2) +
+  stat_summary(fun.y=mean, geom="point", color="red")
+
+
+```
+
+
+
+
+```{r, echo=FALSE}
+ggplot(data = tidy_pt_2, aes(x = Condition, y = A_M_Ratio, color = Condition))+ 
+  geom_jitter(width = 0.45) +
+  labs(x = "Condition", y = "Ratio of Mean Fluorescence", title = "Ratio of Myosin and Actin Mean Gray Values") +
+  stat_summary(fun.data=mean_sdl, fun.args = list(mult=1), 
+        geom="errorbar", color="red", width=0.2) +
+  stat_summary(fun.y=mean, geom="point", color="red")
+```
+
+
+
+
+
+## Questions to Answer  
+1. In part 1 and 2 what was your n? Why did you choose that value to be your n over other
+possibilities? Did you use different n in Part 1 and Part 2. How does this affect your error
+bars (i.e. the s.e.m).  
+
+
+
+2. What is the “bit-depth” of your image. You can find out by going to the “Image” header
+and scrolling to “Type” tab. Your image should be 16-bit, what does that mean?  
+
+Bit-depth is the amount of information an image carries. A standard JPEG image is 8-bit, while ours is 16-bit. This means that our image contains a lot of information in colors and tones that can help us better analyze the cells than just looking at a phone camera picture of them. Even if we can't see all the details, Fiji helps us calculate things by getting into the nitty gritty details.
+
+3. If you multiply the “Area” by the “Mean Gray Value” of your box what value does that
+give you?  
+
+  The value given by multiplying "Area" and "Mean Gray Value" is the integrated density. Integration is usually used to find the area under a curve, so it makes sense if the Gray Value is like a curve. 
