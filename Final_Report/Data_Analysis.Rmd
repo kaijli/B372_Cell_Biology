@@ -1,0 +1,215 @@
+---
+title: "Image Analysis Using Fiji"
+author: "Kaitlyn Li"
+date: "12/10/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(httr_oob_default = TRUE)
+library(tidyverse)
+library(googlesheets4)
+```
+
+
+
+```{r, include = FALSE}
+url <- "https://docs.google.com/spreadsheets/d/1xbR7R0VDsJRSFsaCl_a1nKnIW3qfRwyY9F8K8kez2g4/edit?usp=sharing"
+pt_1 <- read_sheet(ss = url,
+                   sheet = "Part 1")
+pt_2_tidy <- read_csv("/home/kaijli/biol372/Final_Report/Pt2Tidy.csv")
+```
+
+
+
+```{r, echo=FALSE, fig.cap = "Figure 1. A scatter plot depicting the observation of contracted cells in two conditions (A and B) grouped by observer. In this plot, the error bars are calculated by the function `stat_summary` and shown by condition, considering the three observers and 3 images as replicates of the same experiment."}
+ggplot(data = pt_1, aes(x = Condition, y = Proportion, color = Condition))+ 
+  geom_jitter(width = 0.45) +
+  labs(x = "Condition", y = "Fraction Contracted", title = "Observation of Contracted Cells in 4 Conditions") +
+  stat_summary(fun.data=mean_sdl, fun.args = list(mult=1), 
+        geom="errorbar", color="red", width=0.2) +
+  stat_summary(fun.y=mean, geom="point", color="red")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+```
+
+
+
+
+```{r, echo=FALSE}
+ggplot(data = pt_2_tidy, aes(x = Condition, y = M_A_Ratio, color = Condition))+ 
+  geom_jitter(width = 0.45) +
+  labs(x = "Condition", y = "Ratio of Mean Fluorescence", title = "Ratio of Myosin and Actin Mean Gray Values") +
+  stat_summary(fun.data=mean_sdl, fun.args = list(mult=1), 
+        geom="errorbar", color="red", width=0.2) +
+  stat_summary(fun.y=mean, geom="point", color="red")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+
+```{r}
+pt_2_sum<- pt_2_tidy %>%
+  group_by(Condition) %>%
+  summarise(mean_ratio = mean(M_A_Ratio), sd_ratio = sd(M_A_Ratio), n = n()) %>%
+    mutate(CI = qnorm(0.975)*sd_ratio/sqrt(n),
+         lower_ci = mean_ratio - CI,
+         upper_ci = mean_ratio + CI,
+         con = Condition) %>%
+  separate(con, c("RNAi", "FOG?"))
+mean <- mean(pt_2_sum$mean_ratio)
+```
+
+
+```{r}
+ggplot(data=pt_2_sum,
+    aes(x = Condition,y = mean_ratio, ymin = lower_ci, ymax = upper_ci ))+
+    geom_pointrange(aes(col=Condition))+
+    geom_hline(aes(fill=Condition),yintercept =mean, linetype=2)+
+    xlab('RNAi Treatment')+ ylab("Ratio of Mean Fluorescence")+
+    geom_errorbar(aes(ymin=lower_ci, ymax=upper_ci,col=Condition),width=0.5,cex=1)+ 
+    facet_wrap(~RNAi,strip.position="left",nrow=9,scales = "free_y") +
+    theme(plot.title=element_text(size=16,face="bold"),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank(),
+)+ coord_flip()
+```
+
+```{r}
+counts_aov <- aov(Proportion ~ Condition, data = pt_1)
+summary(condition_aov)
+```
+```{r}
+fluor_aov <- aov(M_A_Ratio ~ Condition, data = pt_2_tidy)
+summary(fluor_aov)
+```
+```{r}
+# grubbs.test(pt_1, type = 20)
+```
+
+
+
+```{r}
+#I found this function on stack exchange
+#https://stats.stackexchange.com/questions/30394/how-to-perform-two-sample-t-tests-in-r-by-inputting-sample-statistics-rather-tha
+
+# m1, m2: the sample means
+# s1, s2: the sample standard deviations
+# n1, n2: the same sizes
+# m0: the null value for the difference in means to be tested for. Default is 0. 
+# equal.variance: whether or not to assume equal variance. Default is FALSE. 
+t.test2 <- function(m1,m2,s1,s2,n1,n2,m0=0,equal.variance=FALSE)
+{
+    if( equal.variance==FALSE ) 
+    {
+        se <- sqrt( (s1^2/n1) + (s2^2/n2) )
+        # welch-satterthwaite df
+        df <- ( (s1^2/n1 + s2^2/n2)^2 )/( (s1^2/n1)^2/(n1-1) + (s2^2/n2)^2/(n2-1) )
+    } else
+    {
+        # pooled standard deviation, scaled by the sample sizes
+        se <- sqrt( (1/n1 + 1/n2) * ((n1-1)*s1^2 + (n2-1)*s2^2)/(n1+n2-2) ) 
+        df <- n1+n2-2
+    }      
+    t <- (m1-m2-m0)/se 
+    dat <- c(m1-m2, se, t, 2*pt(-abs(t),df))    
+    names(dat) <- c("Difference of means", "Std Error", "t", "p-value")
+    return(dat) 
+}
+
+```
+
+```{r}
+#calculating means
+pt_1_sum <- pt_1 %>%
+  group_by(Condition) %>%
+  summarize(mean = mean(Proportion),
+            sd = sd(Proportion),
+            n = n())
+pt_1_sum
+```
+
+
+```{r}
+# m1, m2: the sample means
+# s1, s2: the sample standard deviations
+# n1, n2: the same sizes
+# m0: the null value for the difference in means to be tested for. Default is 0. 
+# equal.variance: whether or not to assume equal variance. Default is FALSE. 
+# t.test2 <- function(m1,m2,s1,s2,n1,n2,m0=0,equal.variance=FALSE)
+
+#between FOG, GFP and CHIP
+t.test2(0.500765253, 0.522450997, 0.056321131, 0.059372402, 10, 10)
+#between FOG, GFP and PAPLA1
+t.test2(0.500765253, 0.425238611, 0.056321131, 0.211401332, 10, 10)
+#between FOG, GFP and RHO1
+t.test2(0.500765253, 0.000000000, 0.056321131, 0.000000000, 10, 10)
+#between FOG, PAPLA1 and CHIP
+t.test2(0.425238611, 0.522450997, 0.211401332, 0.059372402, 10, 10)
+#between FOG, RHO1 and CHIP
+t.test2(0.000000000, 0.522450997, 0.000000000, 0.059372402, 10, 10)
+#between FOG, PAPLA1 and RHO1
+t.test2(0.425238611, 0.000000000, 0.211401332, 0.000000000, 10, 10)
+
+#between GFP, FOG and CON
+t.test2(0.500765253, 0.000000000, 0.056321131, 0.000000000, 10, 10)
+#between CHIP, FOG and CON
+t.test2(0.000000000, 0.522450997, 0.000000000, 0.059372402, 10, 10)
+#between PAPLA1, FOG and CON
+t.test2(0.425238611, 0.001412709, 0.211401332, 0.002990351, 10, 10)
+#between RHO1, FOG and CON
+t.test2(0.000000000, 0.000000000, 0.000000000, 0.000000000, 10, 10)
+```
+
+
+
+```{r, echo=FALSE, fig.cap = "Figure 1. A scatter plot depicting the observation of contracted cells in two conditions (A and B) grouped by observer. In this plot, the error bars are calculated by the function `stat_summary` and shown by condition, considering the three observers and 3 images as replicates of the same experiment."}
+ggplot(data = pt_1, aes(x = Condition, y = Proportion, color = Condition))+ 
+  geom_boxplot() +
+  labs(x = "Condition", y = "Fraction Contracted") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+```
+
+
+
+
+```{r, echo=FALSE}
+ggplot(data = pt_2_tidy, aes(x = Condition, y = M_A_Ratio, color = Condition))+ 
+  geom_boxplot() +
+  labs(x = "Condition", y = "Ratio of Mean Fluorescence") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+blot_data <- data.frame("Condition" = c("Rho1", "GFP", "Chip", "PAPLA1"), 
+                        "Tubulin" = c(35127, 30751, 65595, 41010), 
+                        "Rho1" = c(24257, 22012, 65942, 47162), 
+                        "R_SD" = c(11579.89, 11639.978, 20908.034, 11860.646), 
+                        "T_SD" = c(11909.856, 10998.694, 20919.43, 9078.986),
+                        "Ratio_SD" = c(0.239103429, 0.2427470006, 0.2789445461, 0.1757418595))
+
+blot_data <- blot_data %>%
+  mutate(R_T_Ratio = Rho1/Tubulin)
+
+ggplot(blot_data, aes(x = Condition, y = R_T_Ratio, color = Condition)) +
+  geom_point()
+
+ggplot(blot_data, aes(x = Rho1, y = Tubulin, color = Condition)) +
+  geom_point()
+
+ggplot(blot_data, aes(x = Rho1, xmin = Rho1 - R_SD, xmax = Rho1+R_SD, y = Tubulin, ymin = Tubulin-T_SD, ymax = Tubulin+T_SD, color = Condition)) +
+  geom_pointrange()
+
+ggplot(blot_data, aes(x = Condition, y = R_T_Ratio, ymin = R_T_Ratio - Ratio_SD, ymax = R_T_Ratio+Ratio_SD, color = Condition)) +
+  geom_pointrange()+
+  labs(x = "Condition", y = "Ratio of Mean Fluorescence")
+```
+
+
+
+
+
+
